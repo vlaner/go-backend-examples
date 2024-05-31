@@ -63,6 +63,7 @@ func main() {
 		Addr:         ":8080",
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
+		Handler:      appMux,
 	}
 
 	go func() {
