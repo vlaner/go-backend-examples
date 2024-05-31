@@ -40,7 +40,7 @@ Enter following PromQL queries. Click 'Add query' to add another query.
 
 
 # Load with [bombardier](https://github.com/codesenberg/bombardier):
-`bombardier  -c 10000 -n 10000000 http://localhost:8081`
+`bombardier  -c 10000 -n 10000000 http://localhost:8080`
 
 # Example result
 ![alt text](img/image-6.png)
