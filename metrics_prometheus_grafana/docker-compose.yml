@@ -1,0 +1,48 @@
+version: '3.8'
+
+networks:
+  default:
+    driver: bridge
+
+services:
+  backend_app:
+    container_name: backend_app
+    build: 
+      context: ..
+      dockerfile: metrics_prometheus_grafana/Go.Dockerfile
+    command: './exec'
+    tty: true
+    ports:
+      - 8081:8081
+    restart: unless-stopped
+    networks:
+      - default
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+    networks:
+      - default
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    env_file:
+      - .env
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USERNAME}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    entrypoint:
+      - sh
+      - -euc
+      - /run.sh
+    volumes:
+      - ./grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./grafana:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - default
+
