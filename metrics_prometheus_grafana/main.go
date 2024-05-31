@@ -21,7 +21,7 @@ var requestDuration = prometheus.NewHistogramVec(
 		Namespace: "backend",
 		Name:      "http_request_duration_seconds",
 		Help:      "Request duration in seconds",
-		Buckets:   []float64{0.1, 0.15, 0.2, 0.25, 0.3, 0.5, 1, 5},
+		Buckets:   prometheus.DefBuckets,
 	},
 	[]string{"endpoint", "method"},
 )
@@ -48,7 +48,7 @@ func MetricsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func Index(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" { // Check path here
+	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
