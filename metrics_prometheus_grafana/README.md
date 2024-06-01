@@ -53,3 +53,16 @@ Enter following PromQL queries. Click 'Add query' to add another query.
 - backend_http_summary_request_duration_seconds{quantile="0.9"}
 - backend_http_summary_request_duration_seconds{quantile="0.5"}
 3. Configure styles same way as 'Histogram' panel.
+
+# Configure RPS panel
+1. Add new 'Visualization'
+2. Enter following PromQL query
+- sum(rate(backend_http_requests_total[1m])) by (endpoint)
+3. Style panel
+    1. Set 'Title' to 'RPS'.
+    2. Configure 'Legend':
+        1. Select 'Placement' -> 'Right'
+        2. Select 'Values' -> 'Last' and 'Max'
+    3. Configure 'Standard options'
+        1. Set 'Decimals' to 0
+        2. Set 'Unit' to 'requests/sec (rps)'
