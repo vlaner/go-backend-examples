@@ -6,6 +6,10 @@ on:
     paths:
       - github_ci_cd/**
 
+defaults:
+ run:
+  working-directory: ./github_ci_cd
+
 jobs:
   build:
     runs-on: ubuntu-latest
