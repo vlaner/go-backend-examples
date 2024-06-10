@@ -45,6 +45,9 @@ func (sv *StructValidator) UseJsonTags() {
 func (sv *StructValidator) ValidateStruct(s any, locale string) (map[string]string, error) {
 	err := sv.validate.Struct(s)
 	validationErrors, ok := err.(validator.ValidationErrors)
+	if validationErrors == nil {
+		return nil, nil
+	}
 	if !ok {
 		return nil, fmt.Errorf("error is not of type 'validator.ValidationErrors': %w", err)
 	}
