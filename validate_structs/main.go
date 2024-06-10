@@ -13,6 +13,10 @@ type PostRequest struct {
 	Description string `json:"description" validate:"required"`
 }
 
+type OkResponse struct {
+	Ok bool `json:"ok"`
+}
+
 type ErrorResponse struct {
 	Errors map[string]string `json:"errors"`
 }
@@ -32,8 +36,19 @@ func ValidateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	errorResponse := ErrorResponse{Errors: errMsgs}
-	json.NewEncoder(w).Encode(&errorResponse)
+	if errMsgs != nil {
+		errorResponse := ErrorResponse{Errors: errMsgs}
+		err := json.NewEncoder(w).Encode(&errorResponse)
+		if err != nil {
+			log.Println("error encoding json:", err)
+		}
+		return
+	}
+	okResponse := OkResponse{Ok: true}
+	err = json.NewEncoder(w).Encode(&okResponse)
+	if err != nil {
+		log.Println("error encoding json:", err)
+	}
 }
 
 func main() {
