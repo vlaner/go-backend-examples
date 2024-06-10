@@ -26,13 +26,20 @@ type APIError struct {
 	Message any `json:"error"`
 }
 
-func (e APIError) Error() string {
-	return fmt.Sprintf("api error")
-}
-
-func NewApiError(statusCode int, err error) APIError {
+func NewApiError(statusCode int, data any) APIError {
 	return APIError{
 		Code:    statusCode,
-		Message: err.Error(),
+		Message: data,
+	}
+}
+
+func (e APIError) Error() string {
+	return fmt.Sprintf("api error: %d", e.Code)
+}
+
+func BadRequestError(errors map[string]string) APIError {
+	return APIError{
+		Code:    http.StatusBadRequest,
+		Message: errors,
 	}
 }
