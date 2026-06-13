@@ -27,15 +27,15 @@ func (a *Application) CreateUserWithProfile(ctx context.Context, input CreateUse
 	return result, nil
 }
 
-func NewServiceFactory(pool *pgxpool.Pool) UserService {
-	return transactionalUserService{pool: pool}
+func NewPGXTransactionalUserService(pool *pgxpool.Pool) UserService {
+	return pgxTransactionalUserService{pool: pool}
 }
 
-type transactionalUserService struct {
+type pgxTransactionalUserService struct {
 	pool *pgxpool.Pool
 }
 
-func (s transactionalUserService) CreateUserWithProfile(ctx context.Context, input CreateUserWithProfileInput) (CreateUserWithProfileResult, error) {
+func (s pgxTransactionalUserService) CreateUserWithProfile(ctx context.Context, input CreateUserWithProfileInput) (CreateUserWithProfileResult, error) {
 	var result CreateUserWithProfileResult
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		service := NewUserService(

@@ -1,4 +1,4 @@
-package approach4
+package approach3
 
 import (
 	"context"
@@ -13,16 +13,16 @@ type Transactions struct {
 	CreateUserWithProfile TxManager
 }
 
-type transactionalUserService struct {
+type txManagerUserService struct {
 	next UserService
 	tx   Transactions
 }
 
-func NewTransactionalUserService(next UserService, tx Transactions) UserService {
-	return &transactionalUserService{next: next, tx: tx}
+func NewTxManagerUserService(next UserService, tx Transactions) UserService {
+	return &txManagerUserService{next: next, tx: tx}
 }
 
-func (s *transactionalUserService) CreateUserWithProfile(
+func (s *txManagerUserService) CreateUserWithProfile(
 	ctx context.Context,
 	input CreateUserWithProfileInput,
 ) (CreateUserWithProfileResult, error) {
@@ -37,7 +37,7 @@ func (s *transactionalUserService) CreateUserWithProfile(
 		return nil
 	})
 	if err != nil {
-		return CreateUserWithProfileResult{}, fmt.Errorf("transactional create user with profile: %w", err)
+		return CreateUserWithProfileResult{}, fmt.Errorf("tx manager create user with profile: %w", err)
 	}
 
 	return result, nil
