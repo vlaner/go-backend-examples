@@ -21,10 +21,6 @@ type TxConfig struct {
 }
 
 type TxManager struct {
-	pool *pgxpool.Pool
-}
-
-type TxRunner struct {
 	pool   *pgxpool.Pool
 	config TxConfig
 }
@@ -41,21 +37,21 @@ func SerializableTx() TxConfig {
 }
 
 func NewTxManager(pool *pgxpool.Pool) TxManager {
-	return TxManager{pool: pool}
+	return TxManager{pool: pool, config: DefaultTx()}
 }
 
-func (m TxManager) WithConfig(config TxConfig) TxRunner {
-	return TxRunner{pool: m.pool, config: config}
+func (m TxManager) WithConfig(config TxConfig) TxManager {
+	return TxManager{pool: m.pool, config: config}
 }
 
-func (r TxRunner) Do(ctx context.Context, fn func(context.Context) error) error {
-	maxAttempts := r.config.MaxAttempts
+func (m TxManager) Do(ctx context.Context, fn func(context.Context) error) error {
+	maxAttempts := m.config.MaxAttempts
 	if maxAttempts <= 0 {
 		maxAttempts = defaultTxMaxAttempts
 	}
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		err := r.runAttempt(ctx, fn)
+		err := m.runAttempt(ctx, fn)
 		if err == nil {
 			return nil
 		}
@@ -69,8 +65,8 @@ func (r TxRunner) Do(ctx context.Context, fn func(context.Context) error) error 
 	return nil
 }
 
-func (r TxRunner) runAttempt(ctx context.Context, fn func(context.Context) error) error {
-	err := pgx.BeginTxFunc(ctx, r.pool, r.config.Options, func(tx pgx.Tx) error {
+func (m TxManager) runAttempt(ctx context.Context, fn func(context.Context) error) error {
+	err := pgx.BeginTxFunc(ctx, m.pool, m.config.Options, func(tx pgx.Tx) error {
 		txCtx := ContextWithTx(ctx, tx)
 		err := fn(txCtx)
 		if err != nil {
