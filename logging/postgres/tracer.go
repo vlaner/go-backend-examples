@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/vlaner/go-backend-examples/logging/canonicallog"
 )
 
 const (
@@ -34,21 +35,35 @@ type Opts struct {
 	RedactKeys []string
 }
 
+type MultiQueryTracer struct {
+	tracers []pgx.QueryTracer
+}
+
 type LoggingQueryTracer struct {
 	logger *slog.Logger
 	opts   Opts
+}
+
+type CanonicalQueryTracer struct {
+	opts Opts
 }
 
 type pgErrorWrapper struct {
 	err error
 }
 
-type queryTraceKey struct{}
+type loggingQueryTraceKey struct{}
+
+type canonicalQueryTraceKey struct{}
 
 type queryTrace struct {
 	sql       string
 	args      []any
 	startedAt time.Time
+}
+
+func NewMultiQueryTracer(tracers ...pgx.QueryTracer) *MultiQueryTracer {
+	return &MultiQueryTracer{tracers: tracers}
 }
 
 func NewLoggingQueryTracer(logger *slog.Logger, opts Opts) *LoggingQueryTracer {
@@ -62,7 +77,30 @@ func NewLoggingQueryTracer(logger *slog.Logger, opts Opts) *LoggingQueryTracer {
 	}
 }
 
+func NewCanonicalQueryTracer(opts Opts) *CanonicalQueryTracer {
+	return &CanonicalQueryTracer{opts: opts}
+}
+
+func (t *MultiQueryTracer) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
+	for _, tracer := range t.tracers {
+		//nolint:fatcontext // Tracer chaining must pass each tracer's returned context to the next tracer.
+		ctx = tracer.TraceQueryStart(ctx, conn, data)
+	}
+
+	return ctx
+}
+
+func (t *MultiQueryTracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryEndData) {
+	for _, tracer := range t.tracers {
+		tracer.TraceQueryEnd(ctx, conn, data)
+	}
+}
+
 func (d DBLog) LogValue() slog.Value {
+	return slog.GroupValue(d.Attrs()...)
+}
+
+func (d DBLog) Attrs() []slog.Attr {
 	attrs := []slog.Attr{
 		slog.String("op", d.Operation),
 		slog.Duration("duration", d.Duration),
@@ -82,11 +120,7 @@ func (d DBLog) LogValue() slog.Value {
 		attrs = append(attrs, slog.Int64("rows", d.RowsAffected))
 	}
 
-	return slog.GroupValue(attrs...)
-}
-
-func cleanSQL(sql string) string {
-	return strings.TrimSpace(spaceReplacer.Replace(sql))
+	return attrs
 }
 
 func (w pgErrorWrapper) LogValue() slog.Value {
@@ -124,12 +158,15 @@ func (w pgErrorWrapper) LogValue() slog.Value {
 }
 
 func (t *LoggingQueryTracer) TraceQueryStart(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
-	return context.WithValue(ctx, queryTraceKey{}, queryTrace{sql: data.SQL, args: data.Args, startedAt: time.Now()})
+	return context.WithValue(ctx, loggingQueryTraceKey{}, queryTrace{
+		sql:       data.SQL,
+		args:      data.Args,
+		startedAt: time.Now(),
+	})
 }
 
 func (t *LoggingQueryTracer) TraceQueryEnd(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryEndData) {
-	trace, _ := ctx.Value(queryTraceKey{}).(queryTrace)
-
+	trace, _ := ctx.Value(loggingQueryTraceKey{}).(queryTrace)
 	dbLog := DBLog{
 		Operation:    "query",
 		Query:        trace.sql,
@@ -141,6 +178,48 @@ func (t *LoggingQueryTracer) TraceQueryEnd(ctx context.Context, _ *pgx.Conn, dat
 	}
 
 	t.logger.InfoContext(ctx, Message, slog.Any(dbLog.LogKey, dbLog))
+}
+
+func (t *CanonicalQueryTracer) TraceQueryStart(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
+	return context.WithValue(ctx, canonicalQueryTraceKey{}, queryTrace{
+		sql:       data.SQL,
+		args:      data.Args,
+		startedAt: time.Now(),
+	})
+}
+
+func (t *CanonicalQueryTracer) TraceQueryEnd(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryEndData) {
+	trace, _ := ctx.Value(canonicalQueryTraceKey{}).(queryTrace)
+	duration := time.Since(trace.startedAt)
+
+	rowsAffected := data.CommandTag.RowsAffected()
+	dbLog := DBLog{
+		Operation:    "query",
+		Query:        trace.sql,
+		Args:         redactArgs(trace.args, t.opts.RedactKeys),
+		Duration:     duration,
+		Error:        data.Err,
+		RowsAffected: rowsAffected,
+		LogKey:       defaultLogKey,
+	}
+
+	canonicallog.AppendGroup(ctx, "db.queries", dbLog.Attrs()...)
+	canonicallog.Add(ctx, "db.query_count", 1)
+	canonicallog.AddDuration(ctx, "db.duration", duration)
+
+	if rowsAffected > 0 {
+		canonicallog.Add(ctx, "db.rows_affected", rowsAffected)
+	}
+
+	if data.Err == nil {
+		return
+	}
+
+	canonicallog.Add(ctx, "db.error_count", 1)
+}
+
+func cleanSQL(sql string) string {
+	return strings.TrimSpace(spaceReplacer.Replace(sql))
 }
 
 func convertArgs(args []any) slog.Attr {

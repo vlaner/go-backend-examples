@@ -13,4 +13,5 @@ type User struct {
 
 type UserRepository interface {
 	Create(ctx context.Context, user User, password string) (User, error)
+	CountByUsername(ctx context.Context, username string) (int, error)
 }

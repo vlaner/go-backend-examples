@@ -33,3 +33,17 @@ func (r *Repository) Create(ctx context.Context, user domain.User, password stri
 
 	return user, nil
 }
+
+func (r *Repository) CountByUsername(ctx context.Context, username string) (int, error) {
+	var count int
+	err := r.pool.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM users
+		WHERE username = @username
+	`, pgx.NamedArgs{"username": username}).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count users by username: %w", err)
+	}
+
+	return count, nil
+}

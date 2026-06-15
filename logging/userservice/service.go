@@ -36,6 +36,11 @@ func (s *Service) CreateUser(ctx context.Context, command CreateUserCommand) (do
 		return domain.User{}, fmt.Errorf("create user: %w", err)
 	}
 
+	_, err = s.users.CountByUsername(ctx, user.Username)
+	if err != nil {
+		return domain.User{}, fmt.Errorf("count users by username: %w", err)
+	}
+
 	s.logger.InfoContext(ctx, "created user", slog.String("user_id", user.ID.String()), slog.String("username", user.Username))
 
 	return user, nil

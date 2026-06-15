@@ -25,7 +25,7 @@ func TestCreateUserLogsRequestAndPostgresQuery(t *testing.T) {
 
 	ctx := t.Context()
 	var logs bytes.Buffer
-	logger := slog.New(slogctx.NewHandler(slog.NewTextHandler(&logs, nil)))
+	logger := slog.New(slogctx.NewHandler(slogctx.NewMultilineTextHandler(&logs)))
 	t.Cleanup(func() {
 		t.Logf("logger output:\n%s", logs.String())
 	})
@@ -77,7 +77,11 @@ func newTestPool(ctx context.Context, t *testing.T, logger *slog.Logger) *pgxpoo
 		t.Fatalf("postgres connection string: %v", err)
 	}
 
-	pool, err := loggingpostgres.Connect(ctx, dsn, logger)
+	tracer := loggingpostgres.NewMultiQueryTracer(
+		loggingpostgres.NewLoggingQueryTracer(logger, loggingpostgres.Opts{RedactKeys: []string{"password"}}),
+		loggingpostgres.NewCanonicalQueryTracer(loggingpostgres.Opts{RedactKeys: []string{"password"}}),
+	)
+	pool, err := loggingpostgres.Connect(ctx, dsn, loggingpostgres.WithTracer(tracer))
 	if err != nil {
 		t.Fatalf("connect postgres: %v", err)
 	}
@@ -98,7 +102,7 @@ func newTestHandler(pool *pgxpool.Pool, logger *slog.Logger) http.Handler {
 	handler := userhandler.New(service, logger)
 	handler.RegisterRoutes(mux)
 
-	return httpserver.LoggerMiddleware(logger, mux)
+	return httpserver.CanonicalLoggingMiddleware(logger, mux)
 }
 
 func postUser(handler http.Handler, requestID string) *httptest.ResponseRecorder {
@@ -124,7 +128,25 @@ func assertLogOutput(t *testing.T, output string) {
 		t.Fatalf("logs do not contain duplicate request id: %s", output)
 	}
 	if !strings.Contains(output, "db.error.code=23505") {
-		t.Fatalf("logs do not contain unique violation code: %s", output)
+		t.Fatalf("logs do not contain postgres query unique violation code: %s", output)
+	}
+	if !strings.Contains(output, "msg=http/request") {
+		t.Fatalf("logs do not contain canonical request log: %s", output)
+	}
+	if !strings.Contains(output, "db.queries.0.error.code=23505") {
+		t.Fatalf("canonical log does not contain unique violation code on query entry: %s", output)
+	}
+	if !strings.Contains(output, "db.query_count=2") {
+		t.Fatalf("canonical log does not contain successful request db query count: %s", output)
+	}
+	if !strings.Contains(output, "db.query_count=1") {
+		t.Fatalf("canonical log does not contain failed request db query count: %s", output)
+	}
+	if !strings.Contains(output, "db.queries.0.sql=") {
+		t.Fatalf("canonical log does not contain first query entry sql: %s", output)
+	}
+	if !strings.Contains(output, "db.queries.1.sql=") {
+		t.Fatalf("canonical log does not contain second query entry sql: %s", output)
 	}
 	if !strings.Contains(output, "[REDACTED]") {
 		t.Fatalf("logs do not contain redacted fields: %s", output)

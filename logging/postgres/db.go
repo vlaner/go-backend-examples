@@ -3,18 +3,28 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func Connect(ctx context.Context, dsn string, logger *slog.Logger) (*pgxpool.Pool, error) {
+type ConfigFunc func(*pgxpool.Config)
+
+func WithTracer(tracer pgx.QueryTracer) ConfigFunc {
+	return func(config *pgxpool.Config) {
+		config.ConnConfig.Tracer = tracer
+	}
+}
+
+func Connect(ctx context.Context, dsn string, opts ...ConfigFunc) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("parse pool config: %w", err)
 	}
 
-	config.ConnConfig.Tracer = NewLoggingQueryTracer(logger, Opts{RedactKeys: []string{"password"}})
+	for _, opt := range opts {
+		opt(config)
+	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
