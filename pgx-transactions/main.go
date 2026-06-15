@@ -9,9 +9,9 @@ import (
 
 	"github.com/testcontainers/testcontainers-go"
 	pgcontainer "github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/vlaner/go-backend-examples/pgx-transactions/approach1"
-	"github.com/vlaner/go-backend-examples/pgx-transactions/approach2"
-	"github.com/vlaner/go-backend-examples/pgx-transactions/approach3"
+	approachtransactionalservice "github.com/vlaner/go-backend-examples/pgx-transactions/approach-transactional-service"
+	approachtxinctx "github.com/vlaner/go-backend-examples/pgx-transactions/approach-tx-in-ctx"
+	approachunitofwork "github.com/vlaner/go-backend-examples/pgx-transactions/approach-unit-of-work"
 	"github.com/vlaner/go-backend-examples/pgx-transactions/manager"
 	"github.com/vlaner/go-backend-examples/pgx-transactions/postgres"
 	"github.com/vlaner/go-backend-examples/pgx-transactions/profilerepo"
@@ -63,88 +63,88 @@ func run(ctx context.Context) error {
 		return fmt.Errorf("migrate: %w", err)
 	}
 
-	approach1Executor := postgres.NewContextExecutor(pool)
-	users := userrepo.New(approach1Executor)
-	profiles := profilerepo.New(approach1Executor)
+	txInCtxExecutor := postgres.NewContextExecutor(pool)
+	users := userrepo.New(txInCtxExecutor)
+	profiles := profilerepo.New(txInCtxExecutor)
 	txManager := manager.NewPGXManager(pool)
 
-	approach1Service := approach1.NewUserService(txManager, users, profiles)
-	approach1Result, err := approach1Service.CreateUserWithProfile(ctx, approach1.CreateUserWithProfileInput{
-		Username:         "approach-1",
+	txInCtxService := approachtxinctx.NewUserService(txManager, users, profiles)
+	txInCtxResult, err := txInCtxService.CreateUserWithProfile(ctx, approachtxinctx.CreateUserWithProfileInput{
+		Username:         "approach-tx-in-ctx",
 		Password:         examplePassword,
 		Description:      "context transaction profile",
-		Contact:          "approach-1@example.com",
-		SocialMediaLinks: []string{"https://github.com/example/approach-1"},
+		Contact:          "approach-tx-in-ctx@example.com",
+		SocialMediaLinks: []string{"https://github.com/example/approach-tx-in-ctx"},
 	})
 	if err != nil {
-		return fmt.Errorf("approach 1 create user with profile: %w", err)
+		return fmt.Errorf("approach-tx-in-ctx create user with profile: %w", err)
 	}
-	logger.InfoContext(ctx, "approach 1 created user and profile", "user_id", approach1Result.User.ID)
+	logger.InfoContext(ctx, "approach-tx-in-ctx created user and profile", "user_id", txInCtxResult.User.ID)
 
-	approach2Service := approach2.NewUserService(postgres.NewPGXUnitOfWork(pool, approach2.NewRepositories))
-	approach2Result, err := approach2Service.CreateUserWithProfile(ctx, approach2.CreateUserWithProfileInput{
-		Username:         "approach-2",
+	unitOfWorkService := approachunitofwork.NewUserService(postgres.NewPGXUnitOfWork(pool, approachunitofwork.NewRepositories))
+	unitOfWorkResult, err := unitOfWorkService.CreateUserWithProfile(ctx, approachunitofwork.CreateUserWithProfileInput{
+		Username:         "approach-unit-of-work",
 		Password:         examplePassword,
 		Description:      "unit of work profile",
-		Contact:          "approach-2@example.com",
-		SocialMediaLinks: []string{"https://github.com/example/approach-2"},
+		Contact:          "approach-unit-of-work@example.com",
+		SocialMediaLinks: []string{"https://github.com/example/approach-unit-of-work"},
 	})
 	if err != nil {
-		return fmt.Errorf("approach 2 create user with profile: %w", err)
+		return fmt.Errorf("approach-unit-of-work create user with profile: %w", err)
 	}
-	logger.InfoContext(ctx, "approach 2 created user and profile", "user_id", approach2Result.User.ID)
+	logger.InfoContext(ctx, "approach-unit-of-work created user and profile", "user_id", unitOfWorkResult.User.ID)
 
-	approach3App := approach3.NewApplication(approach3.NewPGXTransactionalUserService(pool))
-	approach3Result, err := approach3App.CreateUserWithProfile(ctx, approach3.CreateUserWithProfileInput{
-		Username:         "approach-3",
+	transactionalServiceApp := approachtransactionalservice.NewApplication(approachtransactionalservice.NewPGXTransactionalUserService(pool))
+	transactionalServiceResult, err := transactionalServiceApp.CreateUserWithProfile(ctx, approachtransactionalservice.CreateUserWithProfileInput{
+		Username:         "approach-transactional-service",
 		Password:         examplePassword,
 		Description:      "recreate service per request",
-		Contact:          "approach-3@example.com",
-		SocialMediaLinks: []string{"https://github.com/example/approach-3"},
+		Contact:          "approach-transactional-service@example.com",
+		SocialMediaLinks: []string{"https://github.com/example/approach-transactional-service"},
 	})
 	if err != nil {
-		return fmt.Errorf("approach 3 create user with profile: %w", err)
+		return fmt.Errorf("approach-transactional-service create user with profile: %w", err)
 	}
-	logger.InfoContext(ctx, "approach 3 created user and profile", "user_id", approach3Result.User.ID)
+	logger.InfoContext(ctx, "approach-transactional-service created user and profile", "user_id", transactionalServiceResult.User.ID)
 
-	// Approach 3B: same service, wrapped by a tx manager.
+	// approach-tx-manager: same service, wrapped by a tx manager.
 	// The base service uses a context executor, so the tx manager supplies the tx through ctx.
 	contextExecutor := postgres.NewContextExecutor(pool)
 	txManagerWithConfig := postgres.NewTxManager(pool)
-	approach3TxManagerService := approach3.NewTxManagerUserService(
-		approach3.NewUserService(userrepo.New(contextExecutor), profilerepo.New(contextExecutor)),
-		approach3.Transactions{CreateUserWithProfile: txManagerWithConfig.WithConfig(postgres.SerializableTx())},
+	txManagerService := approachtransactionalservice.NewTxManagerUserService(
+		approachtransactionalservice.NewUserService(userrepo.New(contextExecutor), profilerepo.New(contextExecutor)),
+		approachtransactionalservice.Transactions{CreateUserWithProfile: txManagerWithConfig.WithConfig(postgres.SerializableTx())},
 	)
-	approach3TxManagerResult, err := approach3TxManagerService.CreateUserWithProfile(ctx, approach3.CreateUserWithProfileInput{
-		Username:         "approach-3-tx-manager",
+	txManagerResult, err := txManagerService.CreateUserWithProfile(ctx, approachtransactionalservice.CreateUserWithProfileInput{
+		Username:         "approach-tx-manager",
 		Password:         examplePassword,
 		Description:      "tx manager transaction profile",
-		Contact:          "approach-3-tx-manager@example.com",
-		SocialMediaLinks: []string{"https://github.com/example/approach-3-tx-manager"},
+		Contact:          "approach-tx-manager@example.com",
+		SocialMediaLinks: []string{"https://github.com/example/approach-tx-manager"},
 	})
 	if err != nil {
-		return fmt.Errorf("approach 3 tx manager create user with profile: %w", err)
+		return fmt.Errorf("approach-tx-manager create user with profile: %w", err)
 	}
-	logger.InfoContext(ctx, "approach 3 tx manager created user and profile", "user_id", approach3TxManagerResult.User.ID)
+	logger.InfoContext(ctx, "approach-tx-manager created user and profile", "user_id", txManagerResult.User.ID)
 
-	// Approach 3C: same service, wrapped by unit of work.
+	// approach-unit-of-work-service: same service, wrapped by unit of work.
 	// The unit of work starts the tx and rebuilds the service with tx-scoped repositories.
-	approach3UnitOfWorkService := approach3.NewUnitOfWorkUserService(
-		postgres.NewPGXUnitOfWork(pool, func(db postgres.DBTX) approach3.UserService {
-			return approach3.NewUserService(userrepo.New(db), profilerepo.New(db))
+	unitOfWorkWrapperService := approachtransactionalservice.NewUnitOfWorkUserService(
+		postgres.NewPGXUnitOfWork(pool, func(db postgres.DBTX) approachtransactionalservice.UserService {
+			return approachtransactionalservice.NewUserService(userrepo.New(db), profilerepo.New(db))
 		}),
 	)
-	approach3UnitOfWorkResult, err := approach3UnitOfWorkService.CreateUserWithProfile(ctx, approach3.CreateUserWithProfileInput{
-		Username:         "approach-3-unit-of-work",
+	unitOfWorkWrapperResult, err := unitOfWorkWrapperService.CreateUserWithProfile(ctx, approachtransactionalservice.CreateUserWithProfileInput{
+		Username:         "approach-unit-of-work-service",
 		Password:         examplePassword,
 		Description:      "unit of work transaction profile",
-		Contact:          "approach-3-unit-of-work@example.com",
-		SocialMediaLinks: []string{"https://github.com/example/approach-3-unit-of-work"},
+		Contact:          "approach-unit-of-work-service@example.com",
+		SocialMediaLinks: []string{"https://github.com/example/approach-unit-of-work-service"},
 	})
 	if err != nil {
-		return fmt.Errorf("approach 3 unit of work create user with profile: %w", err)
+		return fmt.Errorf("approach-unit-of-work-service create user with profile: %w", err)
 	}
-	logger.InfoContext(ctx, "approach 3 unit of work created user and profile", "user_id", approach3UnitOfWorkResult.User.ID)
+	logger.InfoContext(ctx, "approach-unit-of-work-service created user and profile", "user_id", unitOfWorkWrapperResult.User.ID)
 
 	return nil
 }

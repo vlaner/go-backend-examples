@@ -1,4 +1,4 @@
-package approach2
+package approachunitofwork
 
 import (
 	"github.com/vlaner/go-backend-examples/pgx-transactions/domain"

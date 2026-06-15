@@ -1,4 +1,4 @@
-package approach4
+package approachusecaseboundary
 
 import (
 	"context"
