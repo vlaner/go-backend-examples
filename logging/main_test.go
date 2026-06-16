@@ -77,9 +77,10 @@ func newTestPool(ctx context.Context, t *testing.T, logger *slog.Logger) *pgxpoo
 		t.Fatalf("postgres connection string: %v", err)
 	}
 
+	redactKeys := loggingpostgres.RedactKeys("password")
 	tracer := loggingpostgres.NewMultiQueryTracer(
-		loggingpostgres.NewLoggingQueryTracer(logger, loggingpostgres.Opts{RedactKeys: []string{"password"}}),
-		loggingpostgres.NewCanonicalQueryTracer(loggingpostgres.Opts{RedactKeys: []string{"password"}}),
+		loggingpostgres.NewLoggingQueryTracer(logger, loggingpostgres.Opts{RedactKeys: redactKeys}),
+		loggingpostgres.NewCanonicalQueryTracer(loggingpostgres.Opts{RedactKeys: redactKeys}),
 	)
 	pool, err := loggingpostgres.Connect(ctx, dsn, loggingpostgres.WithTracer(tracer))
 	if err != nil {

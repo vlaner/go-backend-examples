@@ -32,7 +32,7 @@ type DBLog struct {
 
 type Opts struct {
 	LogKey     string
-	RedactKeys []string
+	RedactKeys map[string]struct{}
 }
 
 type MultiQueryTracer struct {
@@ -64,6 +64,17 @@ type queryTrace struct {
 
 func NewMultiQueryTracer(tracers ...pgx.QueryTracer) *MultiQueryTracer {
 	return &MultiQueryTracer{tracers: tracers}
+}
+
+func RedactKeys(keys ...string) map[string]struct{} {
+	redactKeys := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		if key != "" {
+			redactKeys[key] = struct{}{}
+		}
+	}
+
+	return redactKeys
 }
 
 func NewLoggingQueryTracer(logger *slog.Logger, opts Opts) *LoggingQueryTracer {
@@ -235,7 +246,7 @@ func convertArgs(args []any) slog.Attr {
 	return slog.Int("args_count", len(args))
 }
 
-func redactArgs(args []any, redactKeys []string) []any {
+func redactArgs(args []any, redactKeys map[string]struct{}) []any {
 	if len(redactKeys) == 0 || len(args) != 1 {
 		return args
 	}
@@ -248,10 +259,10 @@ func redactArgs(args []any, redactKeys []string) []any {
 	return []any{redactNamedArgs(namedArgs, redactKeys)}
 }
 
-func redactNamedArgs(args pgx.NamedArgs, redactKeys []string) pgx.NamedArgs {
+func redactNamedArgs(args pgx.NamedArgs, redactKeys map[string]struct{}) pgx.NamedArgs {
 	redacted := make(pgx.NamedArgs, len(args))
 	for key, val := range args {
-		if containsRedactKey(redactKeys, key) {
+		if _, ok := redactKeys[key]; ok {
 			redacted[key] = "[REDACTED]"
 			continue
 		}
@@ -260,18 +271,4 @@ func redactNamedArgs(args pgx.NamedArgs, redactKeys []string) pgx.NamedArgs {
 	}
 
 	return redacted
-}
-
-func containsRedactKey(redactKeys []string, key string) bool {
-	for _, redactKey := range redactKeys {
-		if redactKey == "" {
-			continue
-		}
-
-		if redactKey == key {
-			return true
-		}
-	}
-
-	return false
 }
