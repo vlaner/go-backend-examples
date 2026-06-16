@@ -35,10 +35,6 @@ type Opts struct {
 	RedactKeys map[string]struct{}
 }
 
-type MultiQueryTracer struct {
-	tracers []pgx.QueryTracer
-}
-
 type LoggingQueryTracer struct {
 	logger *slog.Logger
 	opts   Opts
@@ -60,10 +56,6 @@ type queryTrace struct {
 	sql       string
 	args      []any
 	startedAt time.Time
-}
-
-func NewMultiQueryTracer(tracers ...pgx.QueryTracer) *MultiQueryTracer {
-	return &MultiQueryTracer{tracers: tracers}
 }
 
 func RedactKeys(keys ...string) map[string]struct{} {
@@ -90,21 +82,6 @@ func NewLoggingQueryTracer(logger *slog.Logger, opts Opts) *LoggingQueryTracer {
 
 func NewCanonicalQueryTracer(opts Opts) *CanonicalQueryTracer {
 	return &CanonicalQueryTracer{opts: opts}
-}
-
-func (t *MultiQueryTracer) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
-	for _, tracer := range t.tracers {
-		//nolint:fatcontext // Tracer chaining must pass each tracer's returned context to the next tracer.
-		ctx = tracer.TraceQueryStart(ctx, conn, data)
-	}
-
-	return ctx
-}
-
-func (t *MultiQueryTracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryEndData) {
-	for _, tracer := range t.tracers {
-		tracer.TraceQueryEnd(ctx, conn, data)
-	}
 }
 
 func (d DBLog) LogValue() slog.Value {

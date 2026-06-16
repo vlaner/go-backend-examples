@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5/multitracer"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/testcontainers/testcontainers-go"
 	pgcontainer "github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -78,7 +79,7 @@ func newTestPool(ctx context.Context, t *testing.T, logger *slog.Logger) *pgxpoo
 	}
 
 	redactKeys := loggingpostgres.RedactKeys("password")
-	tracer := loggingpostgres.NewMultiQueryTracer(
+	tracer := multitracer.New(
 		loggingpostgres.NewLoggingQueryTracer(logger, loggingpostgres.Opts{RedactKeys: redactKeys}),
 		loggingpostgres.NewCanonicalQueryTracer(loggingpostgres.Opts{RedactKeys: redactKeys}),
 	)
