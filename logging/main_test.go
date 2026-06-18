@@ -101,7 +101,8 @@ func newTestHandler(pool *pgxpool.Pool, logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 	repository := userrepo.New(pool)
 	service := userservice.New(repository, logger)
-	handler := userhandler.New(service, logger)
+	canonicalService := userservice.NewCanonicalCreateUser(service)
+	handler := userhandler.New(canonicalService, logger)
 	handler.RegisterRoutes(mux)
 
 	return httpserver.CanonicalLoggingMiddleware(logger, mux)
@@ -149,6 +150,18 @@ func assertLogOutput(t *testing.T, output string) {
 	}
 	if !strings.Contains(output, "db.queries.1.sql=") {
 		t.Fatalf("canonical log does not contain second query entry sql: %s", output)
+	}
+	if !strings.Contains(output, "service.operation=create_user") {
+		t.Fatalf("canonical log does not contain service operation: %s", output)
+	}
+	if !strings.Contains(output, "service.outcome=created") {
+		t.Fatalf("canonical log does not contain created service outcome: %s", output)
+	}
+	if !strings.Contains(output, "service.outcome=failed") {
+		t.Fatalf("canonical log does not contain failed service outcome: %s", output)
+	}
+	if !strings.Contains(output, "service.user_id=") {
+		t.Fatalf("canonical log does not contain created user id: %s", output)
 	}
 	if !strings.Contains(output, "[REDACTED]") {
 		t.Fatalf("logs do not contain redacted fields: %s", output)

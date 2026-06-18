@@ -1,23 +1,17 @@
 package userhandler
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/vlaner/go-backend-examples/logging/domain"
 	"github.com/vlaner/go-backend-examples/logging/userservice"
 )
 
-type UserCreator interface {
-	CreateUser(ctx context.Context, command userservice.CreateUserCommand) (domain.User, error)
-}
-
 type Handler struct {
-	service UserCreator
+	service userservice.CreateUser
 	logger  *slog.Logger
 }
 
@@ -35,7 +29,7 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
-func New(service UserCreator, logger *slog.Logger) *Handler {
+func New(service userservice.CreateUser, logger *slog.Logger) *Handler {
 	return &Handler{
 		service: service,
 		logger:  logger.With(slog.String("component", "http.user")),

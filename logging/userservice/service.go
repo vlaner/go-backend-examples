@@ -9,9 +9,20 @@ import (
 	"github.com/vlaner/go-backend-examples/logging/domain"
 )
 
+type CreateUser interface {
+	CreateUser(ctx context.Context, command CreateUserCommand) (domain.User, error)
+}
+
 type CreateUserCommand struct {
 	Username string
 	Password string
+}
+
+func (c CreateUserCommand) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("username", c.Username),
+		slog.String("password", "[REDACTED]"),
+	)
 }
 
 type Service struct {
