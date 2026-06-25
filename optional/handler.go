@@ -48,13 +48,18 @@ func (h *UserHandler) patchUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.service.UpdateBio(r.Context(), id, req.ToCommand())
+	response, err := h.service.UpdateBio(r.Context(), id, req.ToCommand())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("patch user: %v", err))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, mapUserResponse(user))
+	if !response.WasUpdated {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, mapUserResponse(response.User))
 }
 
 func parseUserID(w http.ResponseWriter, r *http.Request) (int64, bool) {

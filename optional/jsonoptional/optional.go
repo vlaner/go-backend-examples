@@ -16,10 +16,6 @@ func (o Optional[T]) Optional() optional.Optional[T] {
 	return o.value
 }
 
-func (o Optional[T]) IsZero() bool {
-	return !o.value.IsSet()
-}
-
 func (o *Optional[T]) UnmarshalJSON(data []byte) error {
 	if bytes.Equal(data, []byte("null")) {
 		o.value = optional.Null[T]()
