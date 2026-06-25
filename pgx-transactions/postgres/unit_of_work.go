@@ -32,20 +32,10 @@ func NewPGXUnitOfWorkWithConfig[T any](
 }
 
 func (u *pgxUnitOfWork[T]) Do(ctx context.Context, fn func(ctx context.Context, value T) error) error {
-	maxAttempts := u.config.MaxAttempts
-	if maxAttempts <= 0 {
-		maxAttempts = defaultTxMaxAttempts
-	}
-
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		err := u.runAttempt(ctx, fn)
-		if err == nil {
-			return nil
-		}
-		if isRetryableTxError(err) && attempt < maxAttempts {
-			continue
-		}
-
+	err := withRetry(ctx, u.config.MaxAttempts, noBackoff, func() error {
+		return u.runAttempt(ctx, fn)
+	})
+	if err != nil {
 		return fmt.Errorf("pgx unit of work attempt: %w", err)
 	}
 

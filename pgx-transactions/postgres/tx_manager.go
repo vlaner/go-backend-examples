@@ -2,11 +2,9 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -45,20 +43,10 @@ func (m TxManager) WithConfig(config TxConfig) TxManager {
 }
 
 func (m TxManager) Do(ctx context.Context, fn func(context.Context) error) error {
-	maxAttempts := m.config.MaxAttempts
-	if maxAttempts <= 0 {
-		maxAttempts = defaultTxMaxAttempts
-	}
-
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		err := m.runAttempt(ctx, fn)
-		if err == nil {
-			return nil
-		}
-		if isRetryableTxError(err) && attempt < maxAttempts {
-			continue
-		}
-
+	err := withRetry(ctx, m.config.MaxAttempts, noBackoff, func() error {
+		return m.runAttempt(ctx, fn)
+	})
+	if err != nil {
 		return fmt.Errorf("postgres tx attempt: %w", err)
 	}
 
@@ -80,13 +68,4 @@ func (m TxManager) runAttempt(ctx context.Context, fn func(context.Context) erro
 	}
 
 	return nil
-}
-
-func isRetryableTxError(err error) bool {
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) {
-		return false
-	}
-
-	return pgErr.Code == "40001" || pgErr.Code == "40P01"
 }

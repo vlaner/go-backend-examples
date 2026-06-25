@@ -12,7 +12,6 @@ import (
 	approachtransactionalservice "github.com/vlaner/go-backend-examples/pgx-transactions/approach-transactional-service"
 	approachtxinctx "github.com/vlaner/go-backend-examples/pgx-transactions/approach-tx-in-ctx"
 	approachunitofwork "github.com/vlaner/go-backend-examples/pgx-transactions/approach-unit-of-work"
-	"github.com/vlaner/go-backend-examples/pgx-transactions/manager"
 	"github.com/vlaner/go-backend-examples/pgx-transactions/postgres"
 	"github.com/vlaner/go-backend-examples/pgx-transactions/profilerepo"
 	"github.com/vlaner/go-backend-examples/pgx-transactions/userrepo"
@@ -66,7 +65,7 @@ func run(ctx context.Context) error {
 	txInCtxExecutor := postgres.NewContextExecutor(pool)
 	users := userrepo.New(txInCtxExecutor)
 	profiles := profilerepo.New(txInCtxExecutor)
-	txManager := manager.NewPGXManager(pool)
+	txManager := postgres.NewTxManager(pool)
 
 	txInCtxService := approachtxinctx.NewUserService(txManager, users, profiles)
 	txInCtxResult, err := txInCtxService.CreateUserWithProfile(ctx, approachtxinctx.CreateUserWithProfileInput{

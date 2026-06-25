@@ -9,7 +9,7 @@ import (
 )
 
 type TxManager interface {
-	WithTx(ctx context.Context, fn func(ctx context.Context) error) error
+	Do(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
 type UserService struct {
@@ -52,7 +52,7 @@ func (s *UserService) CreateUserWithProfile(ctx context.Context, input CreateUse
 		SocialMediaLinks: input.SocialMediaLinks,
 	}
 
-	err := s.txManager.WithTx(ctx, func(ctx context.Context) error {
+	err := s.txManager.Do(ctx, func(ctx context.Context) error {
 		err := s.users.Create(ctx, user)
 		if err != nil {
 			return fmt.Errorf("create user: %w", err)
